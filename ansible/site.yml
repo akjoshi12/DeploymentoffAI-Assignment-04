@@ -1,0 +1,77 @@
+# ansible/site.yml
+---
+- hosts: webservers
+  vars:
+    app_name: csv-analysis-tool
+    python_version: 3.12
+    project_root: /opt/{{ app_name }}
+
+  tasks:
+    - name: Install system dependencies
+      apt:
+        name:
+          - python3.12
+          - python3-pip
+          - docker.io
+        state: present
+
+    - name: Create project directory
+      file:
+        path: "{{ project_root }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+
+    - name: Clone Git repository
+      git:
+        repo: 'https://github.com/akjoshi12/DeploymentoffAI-Assignment-04.git'
+        dest: "{{ project_root }}"
+        version: main
+
+    - name: Setup Python virtual environment
+      pip:
+        requirements: "{{ project_root }}/requirements.txt"
+        virtualenv: "{{ project_root }}/venv"
+        virtualenv_python: python3.12
+
+    - name: Build Docker image
+      docker_image:
+        build:
+          path: "{{ project_root }}"
+          pull: no
+        name: "{{ app_name }}"
+        source: build
+
+    - name: Configure firewall
+      ufw:
+        rule: allow
+        port: 5001
+        proto: tcp
+
+    - name: Create systemd service file
+      template:
+        src: templates/flask-app.service.j2
+        dest: /etc/systemd/system/{{ app_name }}.service
+      notify:
+        - restart service
+
+  handlers:
+    - name: restart service
+      systemd:
+        name: "{{ app_name }}"
+        state: restarted
+        daemon_reload: yes
+
+# templates/flask-app.service.j2
+[Unit]
+Description=CSV Analysis Flask Application
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory={{ project_root }}
+ExecStart={{ project_root }}/venv/bin/python src/app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

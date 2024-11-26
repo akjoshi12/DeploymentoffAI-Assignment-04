@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: csv-analysis-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: csv-analysis
+  template:
+    metadata:
+      labels:
+        app: csv-analysis
+    spec:
+      containers:
+      - name: csv-analysis
+        image: csv-analysis-tool:latest
+        ports:
+        - containerPort: 5001
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        env:
+        - name: FLASK_ENV
+          value: production
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+      volumes:
+      - name: config
+        configMap:
+          name: csv-analysis-config

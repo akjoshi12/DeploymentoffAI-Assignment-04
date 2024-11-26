@@ -1,0 +1,71 @@
+pipeline {
+    agent {
+        docker { 
+            image 'python:3.12'
+            args '-u root'
+        }
+    }
+    
+    environment {
+        DOCKER_REGISTRY = ''
+        APP_NAME = 'csv-analysis-tool'
+        PYTHON_VERSION = '3.12'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                git 'https://github.com/akjoshi12/DeploymentoffAI-Assignment-04.git'
+            }
+        }
+        
+        stage('Setup') {
+            steps {
+                sh '''
+                    python -m venv venv
+                    . venv/bin/activate
+                    pip install -r requirements.txt
+                '''
+            }
+        }
+        
+        stage('Lint') {
+            steps {
+                sh '''
+                    . venv/bin/activate
+                    pip install flake8
+                    flake8 src/
+                '''
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                sh '''
+                    . venv/bin/activate
+                    pytest src/test/
+                '''
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.build("${DOCKER_REGISTRY}/${APP_NAME}:${BUILD_NUMBER}")
+                }
+            }
+        }
+        
+        stage('Deploy to Minikube') {
+            steps {
+                script {
+                    sh '''
+                        minikube start
+                        kubectl apply -f k8s/deployment.yaml
+                        kubectl apply -f k8s/service.yaml
+                    '''
+                }
+            }
+        }
+    }
+}
